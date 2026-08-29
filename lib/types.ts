@@ -20,6 +20,7 @@ export interface Item {
   category: string | null;
   done: boolean;
   doneAt: string | null;
+  completedBy: string | null;
   assignedTo: string | null;
   createdBy: string | null;
   position: number;

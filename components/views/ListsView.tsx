@@ -5,7 +5,7 @@ import { AddBar } from "@/components/AddBar";
 import { Icon } from "@/components/Icons";
 import { ItemSheet } from "@/components/ItemSheet";
 import { Sheet } from "@/components/Sheet";
-import { Avatar, ConfirmButton, TextSheet } from "@/components/small";
+import { Avatar, ConfirmButton, PersonDot, TextSheet } from "@/components/small";
 import { useSync } from "@/components/SyncContext";
 import { CATEGORIES, guessCategory } from "@/lib/categories";
 import { readPlainKey, writePlainKey } from "@/lib/client/storage";
@@ -39,7 +39,7 @@ export function ListsView({
   const [doneCollapsed, setDoneCollapsed] = useState(false);
 
   const members = state?.members ?? [];
-  const showMemberDots = members.length > 1;
+  const showAttribution = members.length > 1;
 
   const unchecked = useMemo(
     () => (active ? active.items.filter((i) => !i.done) : []),
@@ -199,7 +199,7 @@ export function ListsView({
                           item={item}
                           listType={listType}
                           memberById={memberById}
-                          showMemberDot={showMemberDots}
+                          showAttribution={showAttribution}
                           onToggle={() => toggle(item)}
                           onDetails={() => setOpenItemId(item.id)}
                         />
@@ -212,7 +212,7 @@ export function ListsView({
                       item={item}
                       listType={listType}
                       memberById={memberById}
-                      showMemberDot={showMemberDots}
+                      showAttribution={showAttribution}
                       onToggle={() => toggle(item)}
                       onDetails={() => setOpenItemId(item.id)}
                     />
@@ -252,7 +252,7 @@ export function ListsView({
                       item={item}
                       listType={listType}
                       memberById={memberById}
-                      showMemberDot={showMemberDots}
+                      showAttribution={showAttribution}
                       onToggle={() => toggle(item)}
                       onDetails={() => setOpenItemId(item.id)}
                     />
@@ -369,19 +369,26 @@ function Row({
   item,
   listType,
   memberById,
-  showMemberDot,
+  showAttribution,
   onToggle,
   onDetails,
 }: {
   item: Item;
   listType: ListType;
   memberById: (id: string | null) => Member | null;
-  showMemberDot: boolean;
+  showAttribution: boolean;
   onToggle: () => void;
   onDetails: () => void;
 }) {
-  const creator = showMemberDot ? memberById(item.createdBy) : null;
   const assignee = listType === "todo" ? memberById(item.assignedTo) : null;
+  // Active items credit whoever added them; completed items credit whoever
+  // checked them off.
+  const person = showAttribution
+    ? item.done
+      ? memberById(item.completedBy)
+      : memberById(item.createdBy)
+    : null;
+  const personLabel = item.done ? "Done by" : "Added by";
 
   return (
     <div className={`item-row ${item.done ? "item-done" : ""}`}>
@@ -399,12 +406,8 @@ function Row({
           <Avatar name={assignee.name} color={assignee.color} size={20} />
         )}
       </button>
-      {creator && (
-        <span
-          className="member-dot"
-          style={{ backgroundColor: creator.color }}
-          title={`Added by ${creator.name}`}
-        />
+      {person && (
+        <PersonDot member={person} label={`${personLabel} ${person.name}`} />
       )}
       <button
         className="icon-btn item-more"

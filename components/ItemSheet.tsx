@@ -154,6 +154,37 @@ export function ItemSheet({
           </div>
         )}
 
+        {members.length > 1 &&
+          (() => {
+            const addedBy = members.find((m) => m.id === item.createdBy);
+            const doneBy = item.done
+              ? members.find((m) => m.id === item.completedBy)
+              : null;
+            if (!addedBy && !doneBy) return null;
+            return (
+              <p className="item-credits">
+                {addedBy && (
+                  <span>
+                    <span
+                      className="credit-dot"
+                      style={{ backgroundColor: addedBy.color }}
+                    />
+                    Added by {addedBy.name}
+                  </span>
+                )}
+                {doneBy && (
+                  <span>
+                    <span
+                      className="credit-dot"
+                      style={{ backgroundColor: doneBy.color }}
+                    />
+                    Done by {doneBy.name}
+                  </span>
+                )}
+              </p>
+            );
+          })()}
+
         <ConfirmButton
           label="Delete item"
           confirmLabel="Tap again to delete"

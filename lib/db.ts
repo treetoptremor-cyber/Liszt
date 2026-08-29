@@ -46,6 +46,7 @@ const SCHEMA: string[] = [
     category text,
     done boolean NOT NULL DEFAULT false,
     done_at timestamptz,
+    completed_by uuid REFERENCES members(id) ON DELETE SET NULL,
     assigned_to uuid REFERENCES members(id) ON DELETE SET NULL,
     created_by uuid REFERENCES members(id) ON DELETE SET NULL,
     position double precision NOT NULL DEFAULT 0,
@@ -74,6 +75,8 @@ const SCHEMA: string[] = [
   `CREATE INDEX IF NOT EXISTS idx_lists_space ON lists(space_id)`,
   `CREATE INDEX IF NOT EXISTS idx_items_list ON items(list_id)`,
   `CREATE INDEX IF NOT EXISTS idx_notes_space ON notes(space_id)`,
+  // Migrations for spaces created before a column existed (idempotent).
+  `ALTER TABLE items ADD COLUMN IF NOT EXISTS completed_by uuid REFERENCES members(id) ON DELETE SET NULL`,
 ];
 
 async function createDb(): Promise<Db> {

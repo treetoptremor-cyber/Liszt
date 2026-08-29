@@ -90,7 +90,7 @@ export async function loadState(space: SpaceRow): Promise<SpaceState> {
       ),
       q(
         `SELECT i.id, i.list_id, i.text, i.qty, i.category, i.done, i.done_at,
-                i.assigned_to, i.created_by, i.position, i.created_at
+                i.completed_by, i.assigned_to, i.created_by, i.position, i.created_at
          FROM items i JOIN lists l ON l.id = i.list_id
          WHERE l.space_id = $1
          ORDER BY i.position, i.created_at`,
@@ -122,6 +122,7 @@ export async function loadState(space: SpaceRow): Promise<SpaceState> {
       category: (r.category as string | null) ?? null,
       done: Boolean(r.done),
       doneAt: r.done_at ? new Date(r.done_at as string).toISOString() : null,
+      completedBy: (r.completed_by as string | null) ?? null,
       assignedTo: (r.assigned_to as string | null) ?? null,
       createdBy: (r.created_by as string | null) ?? null,
       position: Number(r.position),
@@ -289,7 +290,12 @@ export async function applyOp(
       }
       if (patch.done !== undefined) {
         add("done = ?", Boolean(patch.done));
-        sets.push(patch.done ? "done_at = now()" : "done_at = NULL");
+        if (patch.done) {
+          sets.push("done_at = now()");
+          add("completed_by = ?", member.id);
+        } else {
+          sets.push("done_at = NULL", "completed_by = NULL");
+        }
       }
       if (patch.assignedTo !== undefined) {
         let assignee: string | null = null;

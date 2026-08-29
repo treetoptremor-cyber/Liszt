@@ -69,6 +69,7 @@ export function applyOpToState(
             category: op.category ?? null,
             done: false,
             doneAt: null,
+            completedBy: null,
             assignedTo: null,
             createdBy: memberId,
             position: maxPos + 1,
@@ -90,6 +91,7 @@ export function applyOpToState(
               const next = { ...i, ...op.patch };
               if (op.patch.done !== undefined) {
                 next.doneAt = op.patch.done ? now : null;
+                next.completedBy = op.patch.done ? memberId : null;
               }
               return next;
             }),

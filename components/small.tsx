@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Sheet } from "@/components/Sheet";
+import type { Member } from "@/lib/types";
 
 /** Destructive action button: first tap arms it for 3s, second tap fires. */
 export function ConfirmButton({
@@ -112,6 +113,57 @@ export function Avatar({
       title={name}
     >
       {name.trim().charAt(0).toUpperCase()}
+    </span>
+  );
+}
+
+/** A person's color as a small dot; tap it to reveal their name in a bubble.
+ *  Used on list rows to show who added an item (active) or who checked it
+ *  off (completed). */
+export function PersonDot({
+  member,
+  label,
+}: {
+  member: Member;
+  label: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLSpanElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onOutside = (e: Event) => {
+      if (!ref.current?.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("pointerdown", onOutside);
+    const t = setTimeout(() => setOpen(false), 2600);
+    return () => {
+      document.removeEventListener("pointerdown", onOutside);
+      clearTimeout(t);
+    };
+  }, [open]);
+
+  return (
+    <span className="person-dot-wrap" ref={ref}>
+      {open && (
+        <span className="person-tip" role="status">
+          {label}
+        </span>
+      )}
+      <button
+        type="button"
+        className="person-dot-btn"
+        aria-label={label}
+        onClick={(e) => {
+          e.stopPropagation();
+          setOpen((o) => !o);
+        }}
+      >
+        <span
+          className="person-dot"
+          style={{ backgroundColor: member.color }}
+        />
+      </button>
     </span>
   );
 }

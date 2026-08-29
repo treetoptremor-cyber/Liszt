@@ -586,7 +586,6 @@ a {
 
 .list-card {
   padding: 4px 0;
-  overflow: hidden;
 }
 
 .item-row {
@@ -671,11 +670,68 @@ a {
   opacity: 0.6;
 }
 
-.member-dot {
-  width: 7px;
-  height: 7px;
+.person-dot-wrap {
+  position: relative;
+  display: inline-flex;
+  flex: none;
+}
+
+.person-dot-btn {
+  width: 30px;
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   border-radius: 50%;
   flex: none;
+}
+
+.person-dot-btn:active {
+  background: var(--line-soft);
+}
+
+.person-dot {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+}
+
+.item-credits {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  font-size: 13px;
+  color: var(--ink-2);
+}
+
+.item-credits > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.credit-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex: none;
+}
+
+.person-tip {
+  position: absolute;
+  bottom: calc(100% + 5px);
+  right: 3px;
+  white-space: nowrap;
+  background: #2a2925;
+  color: #fbfaf8;
+  font-size: 12px;
+  font-weight: 500;
+  padding: 4px 9px;
+  border-radius: 8px;
+  box-shadow: 0 6px 18px rgba(28, 27, 24, 0.2);
+  z-index: 30;
+  pointer-events: none;
+  animation: fade-in 0.12s ease;
 }
 
 .item-more {
