@@ -65,12 +65,12 @@ export function FamilyView({ code }: { code: string }) {
       try {
         await navigator.share({ title: "Join us on Liszt", text, url: shareUrl });
         return;
-      } catch {
-        // user cancelled — fall through to copy
-        return;
+      } catch (err) {
+        // User cancelled: done. Any other failure: fall through to copy.
+        if (err instanceof DOMException && err.name === "AbortError") return;
       }
     }
-    await copy(`${text}`, "link");
+    await copy(text, "link");
   }
 
   if (!state || !me) return null;

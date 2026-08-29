@@ -9,7 +9,7 @@
   --surface-soft: #fdfcfa;
   --ink: #1c1b18;
   --ink-2: #6e6a63;
-  --ink-3: #a5a099;
+  --ink-3: #8a8478;
   --line: #e7e3dc;
   --line-soft: #efece6;
   --accent: #2e6b4f;
@@ -124,14 +124,31 @@ a {
   font-weight: 600;
 }
 
-.sync-dot {
+.sync-status {
   position: absolute;
-  right: 18px;
+  right: 16px;
   top: 50%;
   transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.sync-pill {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ink-2);
+  background: var(--line-soft);
+  padding: 3px 9px;
+  border-radius: 9px;
+  white-space: nowrap;
+}
+
+.sync-dot {
   width: 9px;
   height: 9px;
   border-radius: 50%;
+  box-sizing: border-box;
 }
 
 .sync-synced {
@@ -144,7 +161,8 @@ a {
 }
 
 .sync-offline {
-  background: #b0aba2;
+  background: transparent;
+  border: 2px solid #8a8478;
 }
 
 @keyframes pulse {
@@ -184,7 +202,7 @@ a {
   padding: 9px 0 7px;
   font-size: 11px;
   font-weight: 500;
-  color: var(--ink-3);
+  color: var(--ink-2);
 }
 
 .tab-active {
@@ -493,18 +511,23 @@ a {
 .chips-row {
   display: flex;
   align-items: center;
+  gap: 6px;
+  padding-bottom: 12px;
+}
+
+/* The chips scroll; the list-options button stays pinned outside the scroller. */
+.chips-scroll {
+  display: flex;
+  align-items: center;
   gap: 8px;
   overflow-x: auto;
-  padding-bottom: 12px;
+  flex: 1;
+  min-width: 0;
   scrollbar-width: none;
 }
 
-.chips-row::-webkit-scrollbar {
+.chips-scroll::-webkit-scrollbar {
   display: none;
-}
-
-.chips-spacer {
-  flex: 1;
 }
 
 .chip {
@@ -785,10 +808,20 @@ a {
   background: var(--accent-soft);
 }
 
+.suggestion-text {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
 .suggestion-cat {
   font-size: 12px;
   color: var(--ink-3);
   flex: none;
+}
+
+.link-btn.btn-armed {
+  background: var(--danger);
+  color: #fff;
 }
 
 /* ———— sheet ———— */

@@ -2,6 +2,7 @@
 
 import {
   createContext,
+  useCallback,
   useContext,
   useEffect,
   useRef,
@@ -54,11 +55,14 @@ export function SyncProvider({
     () => EMPTY_SNAPSHOT
   );
 
+  const mutate = useCallback((op: Op) => engine.mutate(op), [engine]);
+  const clearError = useCallback(() => engine.clearError(), [engine]);
+
   const value: SyncContextValue = {
     snap,
     memberId,
-    mutate: (op) => engine.mutate(op),
-    clearError: () => engine.clearError(),
+    mutate,
+    clearError,
     memberById: (id) =>
       id ? snap.state?.members.find((m) => m.id === id) ?? null : null,
   };

@@ -292,12 +292,18 @@ export async function applyOp(
         sets.push(patch.done ? "done_at = now()" : "done_at = NULL");
       }
       if (patch.assignedTo !== undefined) {
-        add(
-          "assigned_to = ?",
-          patch.assignedTo == null
-            ? null
-            : assertUuid(patch.assignedTo, "member id")
-        );
+        let assignee: string | null = null;
+        if (patch.assignedTo != null) {
+          assignee = assertUuid(patch.assignedTo, "member id");
+          const rows = await q(
+            "SELECT 1 FROM members WHERE id = $1 AND space_id = $2",
+            [assignee, space.id]
+          );
+          if (rows.length === 0) {
+            throw new ApiError(400, "That person isn't in this space");
+          }
+        }
+        add("assigned_to = ?", assignee);
       }
       if (sets.length === 0) return;
       sets.push("updated_at = now()");

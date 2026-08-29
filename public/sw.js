@@ -51,14 +51,14 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // Icons, manifest, images.
+  // Icons, manifest, images — unhashed URLs, so revalidate in the background.
   if (
     url.pathname.startsWith("/icon") ||
     url.pathname === "/manifest.webmanifest" ||
     url.pathname.startsWith("/apple-icon") ||
     /\.(png|svg|ico|woff2?)$/.test(url.pathname)
   ) {
-    event.respondWith(cacheFirst(req, STATIC_CACHE));
+    event.respondWith(staleWhileRevalidate(event, req, STATIC_CACHE));
     return;
   }
 
@@ -75,6 +75,22 @@ async function cacheFirst(req, cacheName) {
   const res = await fetch(req);
   if (res.ok) cache.put(req, res.clone());
   return res;
+}
+
+async function staleWhileRevalidate(event, req, cacheName) {
+  const cache = await caches.open(cacheName);
+  const hit = await cache.match(req);
+  const refresh = fetch(req)
+    .then((res) => {
+      if (res.ok) cache.put(req, res.clone());
+      return res;
+    })
+    .catch(() => hit);
+  if (hit) {
+    event.waitUntil(refresh);
+    return hit;
+  }
+  return refresh;
 }
 
 async function networkFirstPage(req) {

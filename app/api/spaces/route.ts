@@ -16,20 +16,24 @@ export async function POST(req: Request) {
     const memberName = cleanText(body.memberName, "Your name", 40);
 
     const spaceId = randomUUID();
+    // Insert-with-retry: the unique index on code is the arbiter, so two
+    // concurrent creations picking the same code can't both slip through.
     let code = "";
-    for (let attempt = 0; attempt < 8; attempt++) {
-      code = generateCode();
-      const clash = await q("SELECT 1 FROM spaces WHERE code = $1", [code]);
-      if (clash.length === 0) break;
-      code = "";
+    for (let attempt = 0; attempt < 8 && !code; attempt++) {
+      const candidate = generateCode();
+      try {
+        await q("INSERT INTO spaces (id, code, name) VALUES ($1, $2, $3)", [
+          spaceId,
+          candidate,
+          spaceName,
+        ]);
+        code = candidate;
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        if (!/duplicate key|unique constraint|23505/i.test(msg)) throw err;
+      }
     }
     if (!code) throw new Error("Could not generate a unique code");
-
-    await q("INSERT INTO spaces (id, code, name) VALUES ($1, $2, $3)", [
-      spaceId,
-      code,
-      spaceName,
-    ]);
 
     const memberId = randomUUID();
     await q(

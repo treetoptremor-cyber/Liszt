@@ -106,16 +106,26 @@ function AppShell({ code, entry }: { code: string; entry: SpaceEntry }) {
       <header className="topbar">
         <Wordmark className="wordmark-bar" />
         <h1 className="topbar-title">{state?.space.name ?? entry.name}</h1>
-        <div
-          className={`sync-dot sync-${snap.status}`}
-          title={
+        {(() => {
+          const label =
             snap.status === "synced"
               ? "Synced"
               : snap.status === "syncing"
                 ? "Saving…"
-                : `Offline${snap.pendingCount ? ` — ${snap.pendingCount} change${snap.pendingCount === 1 ? "" : "s"} queued` : ""}`
-          }
-        />
+                : `Offline${snap.pendingCount ? ` — ${snap.pendingCount} change${snap.pendingCount === 1 ? "" : "s"} queued` : ""}`;
+          return (
+            <div className="sync-status" role="status" aria-label={label}>
+              {snap.status === "offline" && (
+                <span className="sync-pill">
+                  {snap.pendingCount > 0
+                    ? `Offline · ${snap.pendingCount} queued`
+                    : "Offline"}
+                </span>
+              )}
+              <span className={`sync-dot sync-${snap.status}`} title={label} />
+            </div>
+          );
+        })()}
       </header>
 
       <main className="view-wrap">

@@ -111,6 +111,22 @@ function NoteEditor({ note, onClose }: { note: Note; onClose: () => void }) {
 
   useEffect(() => () => flush.current(), []);
 
+  // If the app is backgrounded or the page is being torn down, save the draft
+  // immediately — mutate() persists to the offline queue synchronously, so the
+  // text survives even if the tab is killed before the network call finishes.
+  useEffect(() => {
+    const onHide = () => {
+      if (document.visibilityState === "hidden") flush.current();
+    };
+    const onPageHide = () => flush.current();
+    document.addEventListener("visibilitychange", onHide);
+    window.addEventListener("pagehide", onPageHide);
+    return () => {
+      document.removeEventListener("visibilitychange", onHide);
+      window.removeEventListener("pagehide", onPageHide);
+    };
+  }, []);
+
   const editor = memberById(note.updatedBy);
 
   return (

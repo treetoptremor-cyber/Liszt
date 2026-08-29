@@ -132,28 +132,29 @@ export function ListsView({
   return (
     <div className="view">
       <div className="chips-row">
-        {lists.map((l) => (
+        <div className="chips-scroll">
+          {lists.map((l) => (
+            <button
+              key={l.id}
+              className={`chip ${active?.id === l.id ? "chip-active" : ""}`}
+              onClick={() => selectList(l.id)}
+            >
+              {l.title}
+              {l.items.filter((i) => !i.done).length > 0 && (
+                <span className="chip-count">
+                  {l.items.filter((i) => !i.done).length}
+                </span>
+              )}
+            </button>
+          ))}
           <button
-            key={l.id}
-            className={`chip ${active?.id === l.id ? "chip-active" : ""}`}
-            onClick={() => selectList(l.id)}
+            className="chip chip-ghost"
+            aria-label="New list"
+            onClick={() => setSheet("new-list")}
           >
-            {l.title}
-            {l.items.filter((i) => !i.done).length > 0 && (
-              <span className="chip-count">
-                {l.items.filter((i) => !i.done).length}
-              </span>
-            )}
+            <Icon name="plus" size={16} />
           </button>
-        ))}
-        <button
-          className="chip chip-ghost"
-          aria-label="New list"
-          onClick={() => setSheet("new-list")}
-        >
-          <Icon name="plus" size={16} />
-        </button>
-        <span className="chips-spacer" />
+        </div>
         {active && (
           <button
             className="icon-btn"
@@ -234,14 +235,14 @@ export function ListsView({
                   </span>
                   {doneLabel} · {done.length}
                 </button>
-                <button
+                <ConfirmButton
+                  label="Clear"
+                  confirmLabel="Really clear?"
                   className="link-btn"
-                  onClick={() =>
+                  onConfirm={() =>
                     mutate({ type: "items.clearDone", listId: active.id })
                   }
-                >
-                  Clear
-                </button>
+                />
               </div>
               {!doneCollapsed && (
                 <div className="card list-card list-card-done">
@@ -331,15 +332,15 @@ export function ListsView({
               </button>
             )}
             {done.length > 0 && (
-              <button
+              <ConfirmButton
+                label={`Clear checked (${done.length})`}
+                confirmLabel="Tap again to clear"
                 className="btn btn-secondary"
-                onClick={() => {
+                onConfirm={() => {
                   mutate({ type: "items.clearDone", listId: active.id });
                   setSheet(null);
                 }}
-              >
-                Clear checked ({done.length})
-              </button>
+              />
             )}
             <ConfirmButton
               label="Delete list"

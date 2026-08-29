@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Sheet } from "@/components/Sheet";
 import { Avatar, ConfirmButton } from "@/components/small";
 import { useSync } from "@/components/SyncContext";
@@ -19,19 +19,36 @@ export function ItemSheet({
   const { snap, mutate } = useSync();
   const [text, setText] = useState(item.text);
   const [qty, setQty] = useState(item.qty ?? "");
+  // Only commit fields the user actually typed in — otherwise closing the
+  // sheet would overwrite edits another member made in the meantime.
+  const textDirty = useRef(false);
+  const qtyDirty = useRef(false);
   const members = snap.state?.members ?? [];
 
+  // Mirror remote edits into fields the user hasn't touched.
+  useEffect(() => {
+    if (!textDirty.current) setText(item.text);
+  }, [item.text]);
+  useEffect(() => {
+    if (!qtyDirty.current) setQty(item.qty ?? "");
+  }, [item.qty]);
+
   function commitText() {
+    if (!textDirty.current) return;
     const t = text.replace(/\s+/g, " ").trim();
     if (!t || t === item.text) {
       setText(item.text);
+      textDirty.current = false;
       return;
     }
     mutate({ type: "item.update", id: item.id, patch: { text: t } });
+    textDirty.current = false;
   }
 
   function commitQty() {
+    if (!qtyDirty.current) return;
     const v = qty.trim();
+    qtyDirty.current = false;
     if ((v || null) === (item.qty ?? null)) return;
     mutate({ type: "item.update", id: item.id, patch: { qty: v || null } });
   }
@@ -50,7 +67,10 @@ export function ItemSheet({
           <input
             className="input"
             value={text}
-            onChange={(e) => setText(e.target.value)}
+            onChange={(e) => {
+              textDirty.current = true;
+              setText(e.target.value);
+            }}
             onBlur={commitText}
             maxLength={200}
           />
@@ -63,7 +83,10 @@ export function ItemSheet({
               <input
                 className="input"
                 value={qty}
-                onChange={(e) => setQty(e.target.value)}
+                onChange={(e) => {
+                  qtyDirty.current = true;
+                  setQty(e.target.value);
+                }}
                 onBlur={commitQty}
                 placeholder="2, 1 kg, a bunch…"
                 maxLength={40}

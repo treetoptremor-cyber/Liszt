@@ -21,6 +21,9 @@ export const viewport: Viewport = {
   initialScale: 1,
   viewportFit: "cover",
   colorScheme: "light",
+  // Android: shrink the layout viewport when the keyboard opens so the
+  // bottom-fixed add bar and sheets stay visible above it.
+  interactiveWidget: "resizes-content",
 };
 
 export default function RootLayout({

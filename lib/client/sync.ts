@@ -28,15 +28,27 @@ const RETRY_BASE_MS = 2000;
 const RETRY_MAX_MS = 15000;
 
 /** Client sync engine: optimistic mutations through a persisted offline
- *  queue, plus near-live polling. One instance per open space. */
+ *  queue, plus near-live polling. One instance per open space.
+ *
+ *  The queue is persisted under a per-space localStorage key that may be
+ *  shared by several open tabs. Writes are merge-based: each engine only
+ *  adds/removes the ops it owns and preserves other tabs' entries. Ops it
+ *  finds at startup are adopted (they're orphans of a closed tab); because
+ *  server ops are idempotent, the rare double-flush from two adopting tabs
+ *  is harmless. */
 export class SpaceSync {
   private code: string;
   private memberId: string;
   private server: SpaceState | null = null;
   private pending: PendingOp[] = [];
+  /** opIds this engine is responsible for flushing (its own + adopted). */
+  private ownOpIds = new Set<string>();
   private lastError: string | null = null;
   private fatal: SyncSnapshot["fatal"] = null;
   private online = true;
+  /** Lowest server version we may accept from a poll — set from mutate
+   *  responses so a slow in-flight GET can't roll the UI back. */
+  private versionFloor = 0;
 
   private listeners = new Set<() => void>();
   private snapshot: SyncSnapshot;
@@ -45,6 +57,7 @@ export class SpaceSync {
   private retryDelay = RETRY_BASE_MS;
   private flushing = false;
   private polling = false;
+  private pollQueued = false;
   private stopped = false;
   private tick = 0;
 
@@ -53,7 +66,10 @@ export class SpaceSync {
     this.memberId = memberId;
     this.server = readJsonKey<SpaceState>(`liszt:state:${code}`);
     this.pending = readJsonKey<PendingOp[]>(`liszt:queue:${code}`) ?? [];
-    this.pending.forEach((p) => (p.inFlight = false));
+    this.pending.forEach((p) => {
+      p.inFlight = false;
+      this.ownOpIds.add(p.opId);
+    });
     this.online = typeof navigator === "undefined" ? true : navigator.onLine;
     this.snapshot = this.buildSnapshot();
   }
@@ -120,6 +136,17 @@ export class SpaceSync {
     document.removeEventListener("visibilitychange", this.handleVisibility);
   }
 
+  /** A dead space stays dead — stop generating traffic for it. */
+  private setFatal(kind: "not-found" | "not-member") {
+    if (this.fatal === kind) return;
+    this.fatal = kind;
+    if (this.pollTimer) clearInterval(this.pollTimer);
+    if (this.retryTimer) clearTimeout(this.retryTimer);
+    this.pollTimer = null;
+    this.retryTimer = null;
+    this.invalidate();
+  }
+
   private handleOnline = () => {
     this.online = true;
     this.retryDelay = RETRY_BASE_MS;
@@ -148,6 +175,7 @@ export class SpaceSync {
   // ---- mutations ---------------------------------------------------------
 
   mutate(op: Op) {
+    if (this.fatal) return;
     // Coalesce rapid successive updates to the same entity (typing in a note,
     // toggling fields in the item sheet) into one queued op.
     const last = this.pending[this.pending.length - 1];
@@ -163,25 +191,32 @@ export class SpaceSync {
         patch: { ...last.op.patch, ...op.patch },
       } as Op;
     } else {
-      this.pending.push({ opId: crypto.randomUUID(), op });
+      const opId = crypto.randomUUID();
+      this.pending.push({ opId, op });
+      this.ownOpIds.add(opId);
     }
     this.persistQueue();
     this.invalidate();
     void this.flush();
   }
 
+  /** Merge-write the shared queue key: keep other tabs' entries, replace ours. */
   private persistQueue() {
-    writeJsonKey(
-      `liszt:queue:${this.code}`,
-      this.pending.map(({ opId, op }) => ({ opId, op }))
+    const stored = readJsonKey<PendingOp[]>(`liszt:queue:${this.code}`) ?? [];
+    const foreign = stored.filter(
+      (e) => e && typeof e.opId === "string" && !this.ownOpIds.has(e.opId)
     );
+    writeJsonKey(`liszt:queue:${this.code}`, [
+      ...foreign,
+      ...this.pending.map(({ opId, op }) => ({ opId, op })),
+    ]);
   }
 
   private async flush() {
-    if (this.flushing || this.stopped) return;
+    if (this.flushing || this.stopped || this.fatal) return;
     this.flushing = true;
     try {
-      while (this.pending.length > 0 && !this.stopped) {
+      while (this.pending.length > 0 && !this.stopped && !this.fatal) {
         const entry = this.pending[0];
         entry.inFlight = true;
         let res: Response;
@@ -207,6 +242,14 @@ export class SpaceSync {
         }
         this.online = true;
         if (res.ok) {
+          try {
+            const body = await res.json();
+            if (typeof body?.version === "number") {
+              this.versionFloor = Math.max(this.versionFloor, body.version);
+            }
+          } catch {
+            // version floor is an optimization; safe to skip
+          }
           this.pending.shift();
           this.persistQueue();
           this.retryDelay = RETRY_BASE_MS;
@@ -242,7 +285,7 @@ export class SpaceSync {
   }
 
   private scheduleRetry() {
-    if (this.retryTimer || this.stopped) return;
+    if (this.retryTimer || this.stopped || this.fatal) return;
     this.retryTimer = setTimeout(() => {
       this.retryTimer = null;
       this.retryDelay = Math.min(this.retryDelay * 2, RETRY_MAX_MS);
@@ -259,13 +302,11 @@ export class SpaceSync {
         { headers: { "x-member-id": this.memberId } }
       );
       if (res.status === 404) {
-        this.fatal = "not-found";
-        this.invalidate();
+        this.setFatal("not-found");
         return false;
       }
       if (res.status === 401 || res.status === 403) {
-        this.fatal = "not-member";
-        this.invalidate();
+        this.setFatal("not-member");
         return false;
       }
       return true;
@@ -277,7 +318,12 @@ export class SpaceSync {
   // ---- polling -----------------------------------------------------------
 
   private async poll(force = false) {
-    if (this.polling || this.stopped) return;
+    if (this.stopped || this.fatal) return;
+    if (this.polling) {
+      // Remember that fresher state was requested while a GET was in flight.
+      this.pollQueued = this.pollQueued || force;
+      return;
+    }
     if (!force && typeof document !== "undefined" && document.hidden) return;
     this.polling = true;
     try {
@@ -287,13 +333,11 @@ export class SpaceSync {
         { headers: { "x-member-id": this.memberId } }
       );
       if (res.status === 404) {
-        this.fatal = "not-found";
-        this.invalidate();
+        this.setFatal("not-found");
         return;
       }
       if (res.status === 401 || res.status === 403) {
-        this.fatal = "not-member";
-        this.invalidate();
+        this.setFatal("not-member");
         return;
       }
       if (!res.ok) return;
@@ -303,7 +347,15 @@ export class SpaceSync {
         if (this.snapshot.status === "offline") this.invalidate();
         return;
       }
-      this.server = body as SpaceState;
+      // Never accept state older than what we already have or what our own
+      // acknowledged mutations imply — a slow response must not roll us back.
+      const incoming = body as SpaceState;
+      const known = Math.max(this.server?.version ?? -1, this.versionFloor);
+      if (typeof incoming.version === "number" && incoming.version < known) {
+        this.pollQueued = true;
+        return;
+      }
+      this.server = incoming;
       writeJsonKey(`liszt:state:${this.code}`, this.server);
       this.invalidate();
     } catch {
@@ -311,6 +363,10 @@ export class SpaceSync {
       this.invalidate();
     } finally {
       this.polling = false;
+      if (this.pollQueued && !this.stopped && !this.fatal) {
+        this.pollQueued = false;
+        void this.poll(true);
+      }
     }
   }
 }
