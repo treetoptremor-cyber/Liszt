@@ -94,6 +94,8 @@ export function applyOpToState(
             assignedTo: op.assignedTo ?? null,
             createdBy: memberId,
             dueDate: op.dueDate ?? null,
+            // Filled in by the server on the next poll, if the text matches.
+            canonicalItemId: null,
             position: maxPos + 1,
             createdAt: now,
           };

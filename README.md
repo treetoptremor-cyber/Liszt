@@ -38,14 +38,43 @@ needed for development.
 3. Add the database: in your Vercel project go to the **Storage** tab →
    **Create Database** → choose **Neon** (Postgres, free tier) → accept.
    This automatically sets `DATABASE_URL` for the project.
-4. **Redeploy** (Deployments → ⋯ → Redeploy) so the app picks up the new
-   environment variable.
+4. Set `CRON_SECRET` to any long random string (Settings → Environment
+   Variables). Vercel Cron sends it as a bearer token to the nightly rollup
+   job in [vercel.json](vercel.json); without it the job answers `401` and
+   analytics never aggregate.
+5. **Redeploy** (Deployments → ⋯ → Redeploy) so the app picks up the new
+   environment variables.
 
 Your app is live at `https://<project>.vercel.app`. The database schema
 creates itself on first use — nothing to migrate.
 
 > Note: the service worker (offline support) only registers on production
 > builds. Locally you can test it with `npm run build && npm start`.
+
+## Catalog curation
+
+Grocery items are matched against a built-in catalog (~286 items, ~731
+aliases) to auto-fill categories. Terms it doesn't recognize accumulate in
+`unmatched_terms`, and when someone categorizes an unrecognized item by hand
+that choice is counted as a suggestion. Both are global and carry no link to
+the person or space they came from, which is also why neither is ever shown
+in the app.
+
+Review and promote them with the operator endpoint (same `CRON_SECRET` bearer
+token as the cron):
+
+```bash
+curl -s https://<project>.vercel.app/api/catalog/curate -H "Authorization: Bearer $CRON_SECRET"
+```
+
+```bash
+curl -s -X POST https://<project>.vercel.app/api/catalog/curate -H "Authorization: Bearer $CRON_SECRET" -H 'content-type: application/json' -d '{"term":"skyr","name":"Skyr","category":"dairy-eggs"}'
+```
+
+Pass `{"term":"gochujang","canonical":"hot sauce"}` instead to file a term
+under an item that already exists. Either way, existing items matching that
+text are backfilled — a category someone picked themselves is never
+overwritten.
 
 ## How it works
 

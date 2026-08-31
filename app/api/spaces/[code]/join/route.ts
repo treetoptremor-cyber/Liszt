@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { q } from "@/lib/db";
 import { cleanText, getSpaceByCode } from "@/lib/server/space";
 import { jsonError, readJson } from "@/lib/server/http";
+import { recordEvent } from "@/lib/server/events";
 import { MEMBER_COLORS } from "@/lib/types";
 import { randomUUID } from "crypto";
 
@@ -32,6 +33,11 @@ export async function POST(
     await q("UPDATE spaces SET version = version + 1 WHERE id = $1", [
       space.id,
     ]);
+
+    await recordEvent(space.id, memberId, {
+      type: "member.joined",
+      props: { member_count: n + 1 },
+    });
 
     return NextResponse.json({
       space: { id: space.id, code: space.code, name: space.name },

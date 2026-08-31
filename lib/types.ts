@@ -32,6 +32,10 @@ export interface Item {
    *  for an undated item. Deliberately a plain date, not a timestamp — a
    *  to-do due Tuesday is due Tuesday wherever you open the app. */
   dueDate: string | null;
+  /** The catalog item this text resolved to, or null when nothing matched.
+   *  Server-side enrichment: grocery lists only, filled on the next poll
+   *  after an add or a text edit. Nothing in the UI depends on it yet. */
+  canonicalItemId: string | null;
   position: number;
   createdAt: string;
 }

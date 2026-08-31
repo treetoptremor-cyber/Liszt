@@ -7,6 +7,7 @@ import {
   requireMember,
 } from "@/lib/server/space";
 import { jsonError, readJson } from "@/lib/server/http";
+import { recordEvent } from "@/lib/server/events";
 import type { Op } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -26,8 +27,15 @@ export async function POST(
     if (typeof body.type !== "string") {
       throw new ApiError(400, "Missing op type");
     }
-    await applyOp(space, member, body as unknown as Op);
-    const version = await bumpVersion(space.id);
+    const result = await applyOp(space, member, body as unknown as Op);
+    const [version] = await Promise.all([
+      bumpVersion(space.id),
+      // Best-effort by construction — `recordEvent` swallows its own errors,
+      // so analytics can never fail the write that produced it (P6).
+      result.event
+        ? recordEvent(space.id, member.id, result.event)
+        : Promise.resolve(),
+    ]);
     return NextResponse.json({ version });
   } catch (err) {
     return jsonError(err);

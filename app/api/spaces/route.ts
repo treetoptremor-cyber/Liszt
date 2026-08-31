@@ -3,6 +3,7 @@ import { q } from "@/lib/db";
 import { generateCode } from "@/lib/codes";
 import { cleanText } from "@/lib/server/space";
 import { jsonError, readJson } from "@/lib/server/http";
+import { recordEvent } from "@/lib/server/events";
 import { MEMBER_COLORS } from "@/lib/types";
 import { randomUUID } from "crypto";
 
@@ -47,6 +48,8 @@ export async function POST(req: Request) {
        ($2, $3, 'todo', 'To-dos', 2)`,
       [randomUUID(), randomUUID(), spaceId]
     );
+
+    await recordEvent(spaceId, memberId, { type: "space.created" });
 
     return NextResponse.json({
       space: { id: spaceId, code, name: spaceName },
