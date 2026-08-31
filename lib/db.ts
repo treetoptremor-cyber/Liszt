@@ -62,6 +62,24 @@ const SCHEMA: string[] = [
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now()
   )`,
+  `CREATE TABLE IF NOT EXISTS recurrences (
+    id uuid PRIMARY KEY,
+    space_id uuid NOT NULL REFERENCES spaces(id) ON DELETE CASCADE,
+    list_id uuid NOT NULL REFERENCES lists(id) ON DELETE CASCADE,
+    text text NOT NULL,
+    days_mask int NOT NULL CHECK (days_mask > 0 AND days_mask < 128),
+    assigned_to uuid REFERENCES members(id) ON DELETE SET NULL,
+    created_by uuid REFERENCES members(id) ON DELETE SET NULL,
+    start_date date NOT NULL,
+    created_at timestamptz NOT NULL DEFAULT now()
+  )`,
+  `CREATE TABLE IF NOT EXISTS recurrence_done (
+    recurrence_id uuid NOT NULL REFERENCES recurrences(id) ON DELETE CASCADE,
+    on_date date NOT NULL,
+    completed_by uuid REFERENCES members(id) ON DELETE SET NULL,
+    done_at timestamptz NOT NULL DEFAULT now(),
+    PRIMARY KEY (recurrence_id, on_date)
+  )`,
   `CREATE TABLE IF NOT EXISTS frequent_items (
     space_id uuid NOT NULL REFERENCES spaces(id) ON DELETE CASCADE,
     text_key text NOT NULL,
@@ -75,8 +93,11 @@ const SCHEMA: string[] = [
   `CREATE INDEX IF NOT EXISTS idx_lists_space ON lists(space_id)`,
   `CREATE INDEX IF NOT EXISTS idx_items_list ON items(list_id)`,
   `CREATE INDEX IF NOT EXISTS idx_notes_space ON notes(space_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_recurrences_space ON recurrences(space_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_recurrence_done_date ON recurrence_done(on_date)`,
   // Migrations for spaces created before a column existed (idempotent).
   `ALTER TABLE items ADD COLUMN IF NOT EXISTS completed_by uuid REFERENCES members(id) ON DELETE SET NULL`,
+  `ALTER TABLE items ADD COLUMN IF NOT EXISTS due_date date`,
 ];
 
 async function createDb(): Promise<Db> {

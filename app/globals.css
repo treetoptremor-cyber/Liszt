@@ -1193,6 +1193,393 @@ a {
   gap: 10px;
 }
 
+/* ———— segmented control ———— */
+
+/* The track has to read as recessed against both the off-white page and a
+   white sheet, so it sits a step darker than --line-soft. */
+.seg {
+  display: flex;
+  gap: 3px;
+  padding: 3px;
+  background: #e6e2da;
+  border-radius: 12px;
+}
+
+.seg-btn {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 14px;
+  border-radius: 9px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--ink-3);
+  white-space: nowrap;
+  transition: background-color 0.14s ease, color 0.14s ease;
+}
+
+.seg-btn-on {
+  background: var(--surface);
+  color: var(--ink);
+  font-weight: 600;
+  box-shadow: 0 1px 3px rgba(28, 27, 24, 0.14);
+}
+
+.seg-compact .seg-btn {
+  height: 30px;
+  font-size: 13px;
+  padding: 0 12px;
+}
+
+.view-switch {
+  display: flex;
+  justify-content: center;
+  padding: 12px 16px 0;
+}
+
+.view-switch .seg {
+  width: min(260px, 100%);
+}
+
+.field-hint {
+  font-size: 12.5px;
+  color: var(--ink-2);
+  line-height: 1.45;
+  margin-top: 8px;
+}
+
+.chips-wrap-gap {
+  margin-bottom: 10px;
+}
+
+/* ———— calendar ———— */
+
+/* No add bar down here, so the view needs far less bottom room than a list. */
+.view-calendar {
+  padding-bottom: calc(var(--tabbar-h) + 92px + env(safe-area-inset-bottom));
+}
+
+.cal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding-bottom: 6px;
+}
+
+.cal-title {
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  text-align: center;
+  flex: 1;
+  min-width: 0;
+}
+
+.cal-head .icon-btn:disabled {
+  opacity: 0.28;
+  cursor: default;
+}
+
+.cal-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding-bottom: 12px;
+}
+
+.cal-controls .link-btn:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+.overdue-pill {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 12px;
+  margin-bottom: 12px;
+  border-radius: var(--radius-s);
+  background: #fbf1ee;
+  border: 1px solid var(--danger-line);
+  color: var(--danger);
+  font-size: 13.5px;
+  font-weight: 600;
+}
+
+.overdue-pill svg {
+  margin-left: auto;
+}
+
+.overdue-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--danger);
+  flex: none;
+}
+
+/* The header and the cells are separate grids inside one frame, so
+   `grid-auto-rows: 1fr` can equalize the week rows without stretching the
+   weekday strip along with them. */
+.cal-frame {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  background: var(--line);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  overflow: hidden;
+  box-shadow: var(--shadow);
+}
+
+.cal-dows,
+.cal-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 1px;
+  background: var(--line);
+}
+
+/* Two weeks: rows grow together so the pair reads as one block. A month has
+   too many rows for that — an empty week would inherit the busiest week's
+   height — so it gets a fixed, compact row instead. */
+.cal-2w .cal-grid {
+  grid-auto-rows: 1fr;
+}
+
+.cal-month .cal-grid {
+  grid-auto-rows: 80px;
+}
+
+.cal-dow {
+  background: var(--surface-soft);
+  text-align: center;
+  padding: 7px 0;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--ink-3);
+}
+
+.cal-cell {
+  background: var(--surface);
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 3px;
+  padding: 5px 4px 6px;
+  text-align: left;
+  min-width: 0;
+  transition: background-color 0.12s ease;
+}
+
+.cal-2w .cal-cell {
+  min-height: 124px;
+}
+
+.cal-month .cal-cell {
+  min-height: 0;
+  overflow: hidden;
+}
+
+.cal-cell:active {
+  background: var(--line-soft);
+}
+
+.cal-cell-past {
+  background: var(--surface-soft);
+}
+
+.cal-cell-out .cal-daynum {
+  color: #c4bfb5;
+}
+
+.cal-cell-out .cal-ent {
+  opacity: 0.55;
+}
+
+.cal-daynum {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--ink-2);
+  line-height: 20px;
+  height: 20px;
+  width: 20px;
+  text-align: center;
+  border-radius: 50%;
+  flex: none;
+}
+
+.cal-cell-today .cal-daynum {
+  background: var(--accent);
+  color: #fff;
+}
+
+.cal-entries {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.cal-ent {
+  font-size: 10.5px;
+  line-height: 1.25;
+  padding: 2px 4px;
+  border-radius: 5px;
+  background: var(--accent-soft);
+  color: var(--accent-deep);
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cal-ent-done {
+  background: var(--line-soft);
+  color: var(--ink-3);
+  text-decoration: line-through;
+  text-decoration-color: #c9c4bb;
+  font-weight: 400;
+}
+
+.cal-ent-overdue {
+  background: #fbf1ee;
+  color: var(--danger);
+}
+
+.cal-more {
+  font-size: 10px;
+  color: var(--ink-3);
+  padding-left: 4px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* ———— day sheet ———— */
+
+.day-sub {
+  font-size: 13.5px;
+  color: var(--ink-2);
+  line-height: 1.5;
+  margin-top: -4px;
+}
+
+.day-empty {
+  font-size: 14.5px;
+  color: var(--ink-3);
+  padding: 10px 2px;
+}
+
+.sheet-add {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sheet-add .input {
+  flex: 1;
+  min-width: 0;
+}
+
+.sheet-add .addbar-btn {
+  flex: none;
+}
+
+.repeat-mark {
+  display: inline-flex;
+  align-items: center;
+  color: var(--ink-3);
+  flex: none;
+}
+
+.item-done .repeat-mark {
+  opacity: 0.5;
+}
+
+.list-tag,
+.due-tag {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--ink-2);
+  background: #f1eee8;
+  padding: 2px 8px;
+  border-radius: 8px;
+  white-space: nowrap;
+  flex: none;
+}
+
+.due-tag-overdue {
+  background: #fbf1ee;
+  color: var(--danger);
+}
+
+.item-done .list-tag,
+.item-done .due-tag {
+  opacity: 0.6;
+}
+
+.item-overdue .item-text {
+  color: var(--danger);
+}
+
+.overdue-when {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--danger);
+  white-space: nowrap;
+  flex: none;
+}
+
+.overdue-who {
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+}
+
+/* ———— weekday picker ———— */
+
+.dow-picker {
+  display: flex;
+  gap: 6px;
+}
+
+.dow-btn {
+  flex: 1;
+  height: 42px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink-2);
+  transition: background-color 0.12s ease, color 0.12s ease,
+    border-color 0.12s ease;
+}
+
+.dow-btn-on {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+@media (max-width: 380px) {
+  .cal-ent {
+    font-size: 9.5px;
+    padding: 2px 3px;
+  }
+
+  .cal-2w .cal-cell {
+    min-height: 118px;
+  }
+}
+
 /* Wide screens: give the phone-first layout a gentle frame */
 @media (min-width: 700px) {
   .app {

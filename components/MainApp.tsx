@@ -7,6 +7,7 @@ import { Icon } from "@/components/Icons";
 import { Toast } from "@/components/Toast";
 import { ListsView } from "@/components/views/ListsView";
 import { NotesView } from "@/components/views/NotesView";
+import { TodosView } from "@/components/views/TodosView";
 import { FamilyView } from "@/components/views/FamilyView";
 import {
   readPlainKey,
@@ -136,7 +137,7 @@ function AppShell({ code, entry }: { code: string; entry: SpaceEntry }) {
         ) : tab === "groceries" ? (
           <ListsView key="grocery" listType="grocery" code={code} />
         ) : tab === "todos" ? (
-          <ListsView key="todo" listType="todo" code={code} />
+          <TodosView code={code} />
         ) : tab === "notes" ? (
           <NotesView />
         ) : (

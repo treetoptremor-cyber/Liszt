@@ -8,6 +8,7 @@ import { Sheet } from "@/components/Sheet";
 import { Avatar, ConfirmButton, PersonDot, TextSheet } from "@/components/small";
 import { useSync } from "@/components/SyncContext";
 import { CATEGORIES, guessCategory } from "@/lib/categories";
+import { formatRelative, todayStr } from "@/lib/client/dates";
 import { readPlainKey, writePlainKey } from "@/lib/client/storage";
 import type { Item, ListType, Member } from "@/lib/types";
 
@@ -402,6 +403,15 @@ function Row({
       <button className="item-main" onClick={onToggle}>
         <span className="item-text">{item.text}</span>
         {item.qty && <span className="item-qty">{item.qty}</span>}
+        {item.dueDate && (
+          <span
+            className={`due-tag ${
+              !item.done && item.dueDate < todayStr() ? "due-tag-overdue" : ""
+            }`}
+          >
+            {formatRelative(item.dueDate)}
+          </span>
+        )}
         {assignee && (
           <Avatar name={assignee.name} color={assignee.color} size={20} />
         )}

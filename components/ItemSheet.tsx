@@ -5,15 +5,18 @@ import { Sheet } from "@/components/Sheet";
 import { Avatar, ConfirmButton } from "@/components/small";
 import { useSync } from "@/components/SyncContext";
 import { CATEGORIES } from "@/lib/categories";
+import { addDays, formatRelative, todayStr } from "@/lib/client/dates";
 import type { Item, ListType } from "@/lib/types";
 
 export function ItemSheet({
   item,
   listType,
+  onBack,
   onClose,
 }: {
   item: Item;
   listType: ListType;
+  onBack?: () => void;
   onClose: () => void;
 }) {
   const { snap, mutate } = useSync();
@@ -59,11 +62,27 @@ export function ItemSheet({
     onClose();
   }
 
+  function back() {
+    commitText();
+    commitQty();
+    onBack?.();
+  }
+
+  function setDue(dueDate: string | null) {
+    mutate({ type: "item.update", id: item.id, patch: { dueDate } });
+  }
+
   return (
-    <Sheet title="Edit item" onClose={close}>
+    <Sheet
+      title={listType === "todo" ? "Edit to-do" : "Edit item"}
+      onBack={onBack ? back : undefined}
+      onClose={close}
+    >
       <div className="sheet-body">
         <label className="field">
-          <span className="field-label">Item</span>
+          <span className="field-label">
+            {listType === "todo" ? "To-do" : "Item"}
+          </span>
           <input
             className="input"
             value={text}
@@ -114,6 +133,50 @@ export function ItemSheet({
               </div>
             </div>
           </>
+        )}
+
+        {listType === "todo" && (
+          <div className="field">
+            <span className="field-label">When</span>
+            <div className="chips-wrap chips-wrap-gap">
+              {(
+                [
+                  ["Today", todayStr()],
+                  ["Tomorrow", addDays(todayStr(), 1)],
+                ] as [string, string][]
+              ).map(([label, value]) => (
+                <button
+                  key={label}
+                  type="button"
+                  className={`chip chip-small ${item.dueDate === value ? "chip-active" : ""}`}
+                  onClick={() => setDue(item.dueDate === value ? null : value)}
+                >
+                  {label}
+                </button>
+              ))}
+              {item.dueDate && (
+                <button
+                  type="button"
+                  className="chip chip-small"
+                  onClick={() => setDue(null)}
+                >
+                  No date
+                </button>
+              )}
+            </div>
+            <input
+              className="input"
+              type="date"
+              value={item.dueDate ?? ""}
+              onChange={(e) => setDue(e.target.value || null)}
+              aria-label="Due date"
+            />
+            <p className="field-hint">
+              {item.dueDate
+                ? `Shows on the calendar — ${formatRelative(item.dueDate)}`
+                : "Undated to-dos live in the list only."}
+            </p>
+          </div>
         )}
 
         {listType === "todo" && members.length > 0 && (

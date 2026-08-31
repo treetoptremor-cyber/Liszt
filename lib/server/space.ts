@@ -1,6 +1,16 @@
 import { q } from "@/lib/db";
 import { normalizeCode } from "@/lib/codes";
-import type { Item, List, Member, Note, Op, SpaceState } from "@/lib/types";
+import { RECURRENCE_HISTORY_DAYS } from "@/lib/types";
+import type {
+  Item,
+  List,
+  Member,
+  Note,
+  Op,
+  Recurrence,
+  RecurrenceDone,
+  SpaceState,
+} from "@/lib/types";
 
 export class ApiError extends Error {
   status: number;
@@ -18,6 +28,42 @@ export function assertUuid(v: unknown, label: string): string {
     throw new ApiError(400, `Invalid ${label}`);
   }
   return v.toLowerCase();
+}
+
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+/** A calendar date must be a real "YYYY-MM-DD" — 2026-02-31 is rejected
+ *  rather than silently rolling into March. */
+export function assertDate(v: unknown, label: string): string {
+  if (typeof v !== "string" || !DATE_RE.test(v)) {
+    throw new ApiError(400, `Invalid ${label}`);
+  }
+  const [y, m, d] = v.split("-").map(Number);
+  const probe = new Date(Date.UTC(y, m - 1, d));
+  if (
+    probe.getUTCFullYear() !== y ||
+    probe.getUTCMonth() !== m - 1 ||
+    probe.getUTCDate() !== d
+  ) {
+    throw new ApiError(400, `Invalid ${label}`);
+  }
+  return v;
+}
+
+/** Weekday bitmask: bit 0 = Sunday … bit 6 = Saturday, at least one day set. */
+export function assertDaysMask(v: unknown): number {
+  if (typeof v !== "number" || !Number.isInteger(v) || v < 1 || v > 127) {
+    throw new ApiError(400, "Pick at least one day of the week");
+  }
+  return v;
+}
+
+/** Postgres `date` comes back as a string on Neon and as a Date (UTC
+ *  midnight) on PGlite — normalize both to "YYYY-MM-DD". */
+function toDateStr(v: unknown): string | null {
+  if (v == null) return null;
+  if (v instanceof Date) return v.toISOString().slice(0, 10);
+  return String(v).slice(0, 10);
 }
 
 export function cleanText(v: unknown, label: string, max: number): string {
@@ -78,8 +124,15 @@ export async function bumpVersion(spaceId: string): Promise<number> {
 }
 
 export async function loadState(space: SpaceRow): Promise<SpaceState> {
-  const [memberRows, listRows, itemRows, noteRows, freqRows] =
-    await Promise.all([
+  const [
+    memberRows,
+    listRows,
+    itemRows,
+    recurRows,
+    recurDoneRows,
+    noteRows,
+    freqRows,
+  ] = await Promise.all([
       q(
         "SELECT id, name, color FROM members WHERE space_id = $1 ORDER BY created_at",
         [space.id]
@@ -90,11 +143,26 @@ export async function loadState(space: SpaceRow): Promise<SpaceState> {
       ),
       q(
         `SELECT i.id, i.list_id, i.text, i.qty, i.category, i.done, i.done_at,
-                i.completed_by, i.assigned_to, i.created_by, i.position, i.created_at
+                i.completed_by, i.assigned_to, i.created_by, i.due_date,
+                i.position, i.created_at
          FROM items i JOIN lists l ON l.id = i.list_id
          WHERE l.space_id = $1
          ORDER BY i.position, i.created_at`,
         [space.id]
+      ),
+      q(
+        `SELECT id, list_id, text, days_mask, assigned_to, created_by,
+                start_date, created_at
+         FROM recurrences WHERE space_id = $1 ORDER BY created_at`,
+        [space.id]
+      ),
+      // Only the recent past — a years-old completion log would bloat every
+      // poll, and the calendar won't page back beyond this window either.
+      q(
+        `SELECT d.recurrence_id, d.on_date, d.completed_by
+         FROM recurrence_done d JOIN recurrences r ON r.id = d.recurrence_id
+         WHERE r.space_id = $1 AND d.on_date >= CURRENT_DATE - $2::int`,
+        [space.id, RECURRENCE_HISTORY_DAYS]
       ),
       q(
         "SELECT id, title, body, updated_by, updated_at, created_at FROM notes WHERE space_id = $1 ORDER BY updated_at DESC",
@@ -125,6 +193,7 @@ export async function loadState(space: SpaceRow): Promise<SpaceState> {
       completedBy: (r.completed_by as string | null) ?? null,
       assignedTo: (r.assigned_to as string | null) ?? null,
       createdBy: (r.created_by as string | null) ?? null,
+      dueDate: toDateStr(r.due_date),
       position: Number(r.position),
       createdAt: new Date(r.created_at as string).toISOString(),
     };
@@ -143,6 +212,23 @@ export async function loadState(space: SpaceRow): Promise<SpaceState> {
     items: itemsByList.get(r.id as string) ?? [],
   }));
 
+  const recurrences: Recurrence[] = recurRows.map((r) => ({
+    id: r.id as string,
+    listId: r.list_id as string,
+    text: r.text as string,
+    daysMask: Number(r.days_mask),
+    assignedTo: (r.assigned_to as string | null) ?? null,
+    createdBy: (r.created_by as string | null) ?? null,
+    startDate: toDateStr(r.start_date) ?? "1970-01-01",
+    createdAt: new Date(r.created_at as string).toISOString(),
+  }));
+
+  const recurrenceDone: RecurrenceDone[] = recurDoneRows.map((r) => ({
+    recurrenceId: r.recurrence_id as string,
+    date: toDateStr(r.on_date) ?? "",
+    completedBy: (r.completed_by as string | null) ?? null,
+  }));
+
   const notes: Note[] = noteRows.map((r) => ({
     id: r.id as string,
     title: r.title as string,
@@ -157,6 +243,8 @@ export async function loadState(space: SpaceRow): Promise<SpaceState> {
     space: { id: space.id, code: space.code, name: space.name },
     members,
     lists,
+    recurrences,
+    recurrenceDone,
     notes,
     frequent: freqRows.map((r) => ({
       text: r.text as string,
@@ -172,6 +260,32 @@ async function assertListInSpace(listId: string, spaceId: string) {
     spaceId,
   ]);
   if (rows.length === 0) throw new ApiError(404, "List not found");
+}
+
+/** Recurrences are a to-do feature; a grocery list can't own one. */
+async function assertTodoList(listId: string, spaceId: string) {
+  const rows = await q(
+    "SELECT id FROM lists WHERE id = $1 AND space_id = $2 AND type = 'todo'",
+    [listId, spaceId]
+  );
+  if (rows.length === 0) throw new ApiError(404, "To-do list not found");
+}
+
+/** Resolve an optional assignee to a member of this space. */
+async function resolveAssignee(
+  value: unknown,
+  spaceId: string
+): Promise<string | null> {
+  if (value == null) return null;
+  const id = assertUuid(value, "member id");
+  const rows = await q("SELECT 1 FROM members WHERE id = $1 AND space_id = $2", [
+    id,
+    spaceId,
+  ]);
+  if (rows.length === 0) {
+    throw new ApiError(400, "That person isn't in this space");
+  }
+  return id;
 }
 
 /** Execute one mutation op. Every statement is scoped to the space so an id
@@ -245,14 +359,18 @@ export async function applyOp(
         op.qty == null ? null : cleanText(op.qty, "Quantity", 40);
       const category =
         op.category == null ? null : cleanText(op.category, "Category", 40);
+      const dueDate =
+        op.dueDate == null ? null : assertDate(op.dueDate, "due date");
       await assertListInSpace(listId, space.id);
+      const assignedTo = await resolveAssignee(op.assignedTo ?? null, space.id);
       const inserted = await q(
-        `INSERT INTO items (id, list_id, text, qty, category, created_by, position)
-         VALUES ($1, $2, $3, $4, $5, $6,
+        `INSERT INTO items (id, list_id, text, qty, category, created_by,
+                            due_date, assigned_to, position)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8,
            (SELECT COALESCE(MAX(position), 0) + 1 FROM items WHERE list_id = $2))
          ON CONFLICT (id) DO NOTHING
          RETURNING id`,
-        [id, listId, text, qty, category, member.id]
+        [id, listId, text, qty, category, member.id, dueDate, assignedTo]
       );
       if (inserted.length > 0) {
         await q(
@@ -298,18 +416,13 @@ export async function applyOp(
         }
       }
       if (patch.assignedTo !== undefined) {
-        let assignee: string | null = null;
-        if (patch.assignedTo != null) {
-          assignee = assertUuid(patch.assignedTo, "member id");
-          const rows = await q(
-            "SELECT 1 FROM members WHERE id = $1 AND space_id = $2",
-            [assignee, space.id]
-          );
-          if (rows.length === 0) {
-            throw new ApiError(400, "That person isn't in this space");
-          }
-        }
-        add("assigned_to = ?", assignee);
+        add("assigned_to = ?", await resolveAssignee(patch.assignedTo, space.id));
+      }
+      if (patch.dueDate !== undefined) {
+        add(
+          "due_date = ?",
+          patch.dueDate == null ? null : assertDate(patch.dueDate, "due date")
+        );
       }
       if (sets.length === 0) return;
       sets.push("updated_at = now()");
@@ -340,6 +453,82 @@ export async function applyOp(
          WHERE items.list_id = $1 AND items.done
            AND items.list_id = lists.id AND lists.space_id = $2`,
         [listId, space.id]
+      );
+      return;
+    }
+    case "recur.add": {
+      const id = assertUuid(op.id, "rule id");
+      const listId = assertUuid(op.listId, "list id");
+      const text = cleanText(op.text, "To-do", 200);
+      const daysMask = assertDaysMask(op.daysMask);
+      const startDate = assertDate(op.startDate, "start date");
+      await assertTodoList(listId, space.id);
+      const assignedTo = await resolveAssignee(op.assignedTo ?? null, space.id);
+      await q(
+        `INSERT INTO recurrences
+           (id, space_id, list_id, text, days_mask, assigned_to, created_by, start_date)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+         ON CONFLICT (id) DO NOTHING`,
+        [id, space.id, listId, text, daysMask, assignedTo, member.id, startDate]
+      );
+      return;
+    }
+    case "recur.update": {
+      const id = assertUuid(op.id, "rule id");
+      const patch = op.patch ?? {};
+      const sets: string[] = [];
+      const params: unknown[] = [];
+      const add = (fragment: string, value: unknown) => {
+        params.push(value);
+        sets.push(fragment.replace("?", `$${params.length}`));
+      };
+      if (patch.text !== undefined) {
+        add("text = ?", cleanText(patch.text, "To-do", 200));
+      }
+      if (patch.daysMask !== undefined) {
+        add("days_mask = ?", assertDaysMask(patch.daysMask));
+      }
+      if (patch.assignedTo !== undefined) {
+        add("assigned_to = ?", await resolveAssignee(patch.assignedTo, space.id));
+      }
+      if (sets.length === 0) return;
+      params.push(id, space.id);
+      await q(
+        `UPDATE recurrences SET ${sets.join(", ")}
+         WHERE id = $${params.length - 1} AND space_id = $${params.length}`,
+        params
+      );
+      return;
+    }
+    case "recur.delete": {
+      const id = assertUuid(op.id, "rule id");
+      await q("DELETE FROM recurrences WHERE id = $1 AND space_id = $2", [
+        id,
+        space.id,
+      ]);
+      return;
+    }
+    case "recur.setDone": {
+      const id = assertUuid(op.id, "rule id");
+      const date = assertDate(op.date, "date");
+      if (op.done) {
+        // The join against recurrences keeps the write scoped to this space,
+        // and doubles as the existence check for the rule.
+        await q(
+          `INSERT INTO recurrence_done (recurrence_id, on_date, completed_by)
+           SELECT r.id, $2::date, $3 FROM recurrences r
+           WHERE r.id = $1 AND r.space_id = $4
+           ON CONFLICT (recurrence_id, on_date)
+           DO UPDATE SET completed_by = EXCLUDED.completed_by, done_at = now()`,
+          [id, date, member.id, space.id]
+        );
+        return;
+      }
+      await q(
+        `DELETE FROM recurrence_done d USING recurrences r
+         WHERE d.recurrence_id = $1 AND d.on_date = $2::date
+           AND r.id = d.recurrence_id AND r.space_id = $3`,
+        [id, date, space.id]
       );
       return;
     }

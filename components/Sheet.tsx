@@ -8,14 +8,19 @@ const FOCUSABLE =
 
 /** Bottom sheet used for item details, list settings, renames, etc.
  *  Manages focus: moves it inside on open, keeps Tab cycling within the
- *  dialog, and hands it back to the opener on close. */
+ *  dialog, and hands it back to the opener on close.
+ *
+ *  Pass `onBack` when the sheet was drilled into from another one — the
+ *  calendar shows a single sheet at a time and steps back to the day. */
 export function Sheet({
   title,
   onClose,
+  onBack,
   children,
 }: {
   title?: string;
   onClose: () => void;
+  onBack?: () => void;
   children: React.ReactNode;
 }) {
   const panelRef = useRef<HTMLDivElement>(null);
@@ -32,7 +37,7 @@ export function Sheet({
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
-        onClose();
+        (onBack ?? onClose)();
         return;
       }
       if (e.key !== "Tab") return;
@@ -55,7 +60,7 @@ export function Sheet({
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [onClose]);
+  }, [onClose, onBack]);
 
   return (
     <div className="sheet-backdrop" onClick={onClose}>
@@ -69,6 +74,11 @@ export function Sheet({
         onClick={(e) => e.stopPropagation()}
       >
         <div className="sheet-head">
+          {onBack && (
+            <button className="icon-btn" onClick={onBack} aria-label="Back">
+              <Icon name="chevron-left" size={20} />
+            </button>
+          )}
           {title ? <h2 className="sheet-title">{title}</h2> : <span />}
           <button className="icon-btn" onClick={onClose} aria-label="Close">
             <Icon name="x" size={20} />

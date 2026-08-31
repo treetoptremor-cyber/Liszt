@@ -12,7 +12,11 @@ interface IconProps {
     | "copy"
     | "trash"
     | "chevron-down"
-    | "chevron-left";
+    | "chevron-left"
+    | "chevron-right"
+    | "calendar"
+    | "list"
+    | "repeat";
   size?: number;
 }
 
@@ -77,6 +81,30 @@ const PATHS: Record<IconProps["name"], React.ReactNode> = {
   ),
   "chevron-down": <path d="M6 9.5l6 6 6-6" />,
   "chevron-left": <path d="M14.5 5.5L8 12l6.5 6.5" />,
+  "chevron-right": <path d="M9.5 5.5L16 12l-6.5 6.5" />,
+  calendar: (
+    <>
+      <rect x="3.5" y="5" width="17" height="15.5" rx="3" />
+      <path d="M3.5 9.8h17" />
+      <path d="M8 3.5v3M16 3.5v3" />
+    </>
+  ),
+  list: (
+    <>
+      <path d="M9 6.5h11M9 12h11M9 17.5h11" />
+      <circle cx="4.6" cy="6.5" r="1.3" fill="currentColor" stroke="none" />
+      <circle cx="4.6" cy="12" r="1.3" fill="currentColor" stroke="none" />
+      <circle cx="4.6" cy="17.5" r="1.3" fill="currentColor" stroke="none" />
+    </>
+  ),
+  repeat: (
+    <>
+      <path d="M4 11.2V10a4 4 0 0 1 4-4h11" />
+      <path d="M15.8 2.8L19 6l-3.2 3.2" />
+      <path d="M20 12.8V14a4 4 0 0 1-4 4H5" />
+      <path d="M8.2 14.8L5 18l3.2 3.2" />
+    </>
+  ),
 };
 
 export function Icon({ name, size = 22 }: IconProps) {

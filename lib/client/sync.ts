@@ -21,6 +21,21 @@ interface PendingOp {
   inFlight?: boolean;
 }
 
+/** State cached by an older build (or an older server) can be missing whole
+ *  collections. Fill them in so the reducer and views never meet `undefined`. */
+function hydrate(state: SpaceState | null): SpaceState | null {
+  if (!state) return null;
+  return {
+    ...state,
+    members: state.members ?? [],
+    lists: state.lists ?? [],
+    recurrences: state.recurrences ?? [],
+    recurrenceDone: state.recurrenceDone ?? [],
+    notes: state.notes ?? [],
+    frequent: state.frequent ?? [],
+  };
+}
+
 const POLL_MS = 3000;
 /** A hidden tab still polls every Nth tick so it never drifts far behind. */
 const HIDDEN_POLL_EVERY = 7;
@@ -64,7 +79,7 @@ export class SpaceSync {
   constructor(code: string, memberId: string) {
     this.code = code;
     this.memberId = memberId;
-    this.server = readJsonKey<SpaceState>(`liszt:state:${code}`);
+    this.server = hydrate(readJsonKey<SpaceState>(`liszt:state:${code}`));
     this.pending = readJsonKey<PendingOp[]>(`liszt:queue:${code}`) ?? [];
     this.pending.forEach((p) => {
       p.inFlight = false;
@@ -355,7 +370,7 @@ export class SpaceSync {
         this.pollQueued = true;
         return;
       }
-      this.server = incoming;
+      this.server = hydrate(incoming);
       writeJsonKey(`liszt:state:${this.code}`, this.server);
       this.invalidate();
     } catch {
